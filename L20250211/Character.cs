@@ -10,5 +10,10 @@ namespace L20250211
     {
         public Character() { }
         ~Character() { }
+        public int hp;
+        public int gold;
+        public void Attack() { }
+        public void Die() { }
+
     }
 }

@@ -5,13 +5,9 @@
 
         static void Main(string[] args)
         {
-            Monster[] monsters = new Monster[2];
-
-            monsters[0] = new Goblin();
-            monsters[1] = new Slime();
-
-            monsters[0].Move();
-            monsters[1].Move();
+            Player player = new Player();
+            player.Hp = 10;
+            Console.WriteLine(player.Hp);
         }
     }
 }

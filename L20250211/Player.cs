@@ -10,21 +10,26 @@ namespace L20250211
     {
         public Player() 
         {
-            hp = 100;
+            Hp = 100;
             gold = -10;
             Console.WriteLine("플레이어 생성자");
         }
         public Player(int inHp, int inGold)
         {
-            hp=inHp;
+            Hp=inHp;
             gold=inGold;
         }
         ~Player() 
         {
             Console.WriteLine("플레이어 소멸자");
         }
-        public int hp;
+        public int Hp 
+        {
+            get; set;
+        }
+
         public int gold;
+
         public void Attack() { }
         public void Move() 
         {
