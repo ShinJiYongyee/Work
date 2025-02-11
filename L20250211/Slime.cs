@@ -8,13 +8,16 @@ namespace L20250211
 {
     public class Slime : Monster
     {
-        public Slime() { }
+        public Slime() 
+        {
+            Console.WriteLine("슬라임 생성자");
+        }
         ~Slime() { }
         public int hp;
         public int gold;
         public void Attack() { }
         public void Die() { }
-        public void Move() 
+        public override void Move() 
         {
             Console.WriteLine("Slime slide");
         }

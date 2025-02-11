@@ -8,13 +8,16 @@ namespace L20250211
 {
     public class Goblin : Monster
     {
-        public Goblin() { }
-        ~Goblin() { }
-        public int hp;
-        public int gold;
-        public void Attack() { }
-        public void Die() { }
-        public void Move() 
+        public Goblin() 
+        {
+            Console.WriteLine("고블린 생성자");
+        }
+        ~Goblin() 
+        {
+            Console.WriteLine("고블린 소멸자");
+        }
+
+        public override void Move() 
         {
             Console.WriteLine("goblin walk");
         }
