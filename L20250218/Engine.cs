@@ -79,7 +79,13 @@ namespace L20250218
                 if (IsWin())
                 {
                     Console.WriteLine("You Win");
-                    Load();
+                    if (IsPressed(Console.ReadKey()))
+                    {
+                        Console.Clear();
+                        Load();
+                        Render();
+                    }
+
                 }
             }
         }
