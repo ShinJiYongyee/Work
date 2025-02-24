@@ -1,43 +1,40 @@
 ﻿using System.Formats.Asn1;
+using System.Xml;
 
 namespace L20250224
 {
-    class BitArray32
-    {
-        public uint Data;   //0000 0000 0000 0000
 
-        public void On(int position)
-        {
-            Data = Data | (uint)(1 << (position - 1));
-        }
-
-        public void Off(int position)
-        {
-            Data = Data & ~(uint)(1 << (position - 1));
-        }
-
-        public bool Check(uint other)
-        {
-            return (int)(Data & other) > 0 ? true : false;
-        }
-    }
     internal class Program
     {
         static void Main(string[] args)
         {
-            BitArray32 bitArray1 = new BitArray32();   //0000
-            BitArray32 bitArray2 = new BitArray32();
+            //1. nxn 정사각형 크기 공백과 벽 -> n^2 정수 배열, 0과 1
+            //2. 둘중 하나가 벽이면 벽, 둘 다 공백이면 공백 -> or
+            //3. 정수 배열 암호
 
-            bitArray1.On(3);   //0100
-            bitArray1.On(1);   //0101
+            int n = 5;
+            int[] arr1 = { 9, 20, 28, 18, 11 };
+            int[] arr2 = { 30, 1, 21, 17, 28 };
+            int[] result = new int[n];
 
-            Console.WriteLine(Convert.ToString(bitArray1.Data, 2));
+            for (int i = 0; i < n; i++)
+            {
+                result[i] = arr1[i] | arr2[i];
+            }
 
-            bitArray1.Off(1);  //0100
-            Console.WriteLine(Convert.ToString(bitArray1.Data, 2));
+            int bitMask = 0b00000001;
 
-            Console.WriteLine(bitArray1.Check(bitArray2.Data));
-            
+            for (int i = 0; i < n; ++i)
+            {
+                bitMask = 1 << (n - 1);
+                //Convert.ToString(result[i], 2)
+                for (int j = 0; j < 8; j++)
+                {
+                    Console.Write((bitMask & result[i]) > 0 ? "#" : " ");
+                    bitMask = bitMask >> 1;
+                }
+                Console.WriteLine();
+            }
 
         }
 
