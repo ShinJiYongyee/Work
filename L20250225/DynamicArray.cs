@@ -37,17 +37,29 @@ namespace L20250225
         }
         public void RemoveAt(int index)
         {
-            int[] newInts = new int[count - 1];
-            for(int i=0; i<index; i++)
+            try
             {
-                newInts[i] = ints[i];
+
+
+                if (index < 0 || index >= count)
+                    throw new IndexOutOfRangeException("Index out of range");
+
+                int[] newInts = new int[count - 1];
+                for (int i = 0; i < index; i++)
+                {
+                    newInts[i] = ints[i];
+                }
+                for (int i = index; i < count - 1; i++)
+                {
+                    newInts[i] = ints[i + 1];
+                }
+                ints = newInts;
+                count--;
             }
-            for (int i = index; i < count-1; i++)
+            catch(IndexOutOfRangeException e) 
             {
-                newInts[i] = ints[i+1];   
+                Console.WriteLine("Index out of range");
             }
-            this.ints = newInts;
-            count--;
         }
         public int Count()
         {
