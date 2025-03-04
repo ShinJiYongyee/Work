@@ -21,6 +21,13 @@ namespace SDL_Sample
                 SDL.SDL_WindowFlags.SDL_WINDOW_SHOWN);
 
             //엔진이 구동되는 동안 실행하는 부분
+
+            //붓
+            IntPtr myRenderer = SDL.SDL_CreateRenderer(myWindow, -1,
+                SDL.SDL_RendererFlags.SDL_RENDERER_TARGETTEXTURE |
+                SDL.SDL_RendererFlags.SDL_RENDERER_ACCELERATED |
+                SDL.SDL_RendererFlags.SDL_RENDERER_PRESENTVSYNC);
+
             //메세지 처리(사용자 처리가 추가 구조를 변경)
             SDL.SDL_Event myEvent;
             bool isRunning = true;
@@ -33,9 +40,14 @@ namespace SDL_Sample
                     case SDL.SDL_EventType.SDL_QUIT:
                         isRunning = false; break;       //창 닫기 버튼 누르면 창 닫기
                 }
-            }
 
-            //흰 윈도우가 나오면 성공
+                //붓으로 그리고 cpu에게 던져주기
+                SDL.SDL_SetRenderDrawColor(myRenderer, 0, 0, 0, 0);
+                SDL.SDL_RenderClear(myRenderer);
+                SDL.SDL_RenderPresent(myRenderer);
+
+                //검은색 윈도우가 나오면 성공
+            }
 
             //엔진 끄기
             //저장한 자료 제거
