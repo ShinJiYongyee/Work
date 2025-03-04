@@ -1,10 +1,12 @@
 ﻿using SDL2;
+using static SDL2.SDL;
 namespace SDL_Sample
 {
     internal class Program
     {
         static void Main(string[] args)
         {
+
             //엔진 초기화
             //HW의 모든 장치를 초기화
             if (SDL.SDL_Init(SDL.SDL_INIT_EVERYTHING) < 0)
@@ -31,6 +33,7 @@ namespace SDL_Sample
             //메세지 처리(사용자 처리가 추가 구조를 변경)
             SDL.SDL_Event myEvent;
             bool isRunning = true;
+            Random random = new Random();
             while (isRunning)   //Event Loop == Game Loop
             {
                 //매 프레임마다 메세지 유무를 확인 -> unity의 PeekMessage
@@ -41,12 +44,34 @@ namespace SDL_Sample
                         isRunning = false; break;       //창 닫기 버튼 누르면 창 닫기
                 }
 
-                //붓으로 그리고 cpu에게 던져주기
-                SDL.SDL_SetRenderDrawColor(myRenderer, 0, 0, 0, 0);
+                //붓으로 윈도우 그리고 cpu에게 던져주기
+                SDL.SDL_SetRenderDrawColor(myRenderer, 255, 255, 255, 0);
                 SDL.SDL_RenderClear(myRenderer);
-                SDL.SDL_RenderPresent(myRenderer);
 
-                //검은색 윈도우가 나오면 성공
+                //랜덤 사각형 100개 그리기
+                for (int i = 0; i < 100; i++)
+                {
+                    //랜덤 색 정하기
+                    byte r = (byte)(random.Next() % 256);
+                    byte g = (byte)(random.Next() % 256);
+                    byte b = (byte)(random.Next() % 256);
+
+                    //랜덤 사각형 만들기
+                    SDL_Rect rect = new SDL_Rect();
+                    rect.x = random.Next(0, 640);
+                    rect.y = random.Next(0, 480);
+                    rect.w = random.Next(0, 640);
+                    rect.h = random.Next(0, 480);
+
+                    //색 정하기
+                    SDL_SetRenderDrawColor(myRenderer, r, g, b, 0);
+                    //정한 색으로 사각형 칠하기
+                    SDL_RenderFillRect(myRenderer, ref rect);
+                    //사각형 그리기
+                    SDL.SDL_RenderPresent(myRenderer);
+
+                }
+
             }
 
             //엔진 끄기
