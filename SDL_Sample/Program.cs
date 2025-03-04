@@ -7,27 +7,35 @@ namespace SDL_Sample
         {
             //엔진 초기화
             //HW의 모든 장치를 초기화
-            if( SDL.SDL_Init(SDL.SDL_INIT_EVERYTHING) < 0)  
+            if (SDL.SDL_Init(SDL.SDL_INIT_EVERYTHING) < 0)
             {
                 Console.WriteLine("Fail Init");
             }
 
             //창 만들기
             //IntPtr 자료형으로 정수형 주소 저장
-            IntPtr myWindow =  SDL.SDL_CreateWindow(
+            IntPtr myWindow = SDL.SDL_CreateWindow(
                 "Game",
-                100, 100, 
-                640, 480, 
+                100, 100,
+                640, 480,
                 SDL.SDL_WindowFlags.SDL_WINDOW_SHOWN);
 
-            //메세지 처리(사용자 처리가 추가 구조를 변경)
             //엔진이 구동되는 동안 실행하는 부분
-            while (true)
+            //메세지 처리(사용자 처리가 추가 구조를 변경)
+            SDL.SDL_Event myEvent;
+            bool isRunning = true;
+            while (isRunning)   //Event Loop == Game Loop
             {
                 //매 프레임마다 메세지 유무를 확인 -> unity의 PeekMessage
-                SDL.SDL_Event myEvent;
-                SDL.SDL_PollEvent(out myEvent );    
+                SDL.SDL_PollEvent(out myEvent);
+                switch (myEvent.type)
+                {
+                    case SDL.SDL_EventType.SDL_QUIT:
+                        isRunning = false; break;       //창 닫기 버튼 누르면 창 닫기
+                }
             }
+
+            //흰 윈도우가 나오면 성공
 
             //엔진 끄기
             //저장한 자료 제거
