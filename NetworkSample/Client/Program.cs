@@ -19,16 +19,37 @@ namespace Client
             //IPEndPoint serverEndPoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), 4000); 
             serverSocket.Connect(serverEndPoint);
 
-            byte[] buffer;
+            //계산할 문제
+            string message = "100+200";
 
-            string message = "Hello World";
-            buffer = Encoding.UTF8.GetBytes(message);
-            int sendLength = serverSocket.Send(buffer);
+            //문제 보내기
+            byte[] sendBuffer = new byte[1024];
+            sendBuffer = Encoding.UTF8.GetBytes(message);
+            int sendLength = serverSocket.Send(sendBuffer);
+            if (sendLength < sendBuffer.Length)
+            {
+                sendLength = serverSocket.Send(sendBuffer);
+            }
+            if (sendLength != 0)
+            {
+                Console.WriteLine("보내기");
 
-            byte[] buffer2 = new byte[1024];
-            int receiveLength = serverSocket.Receive(buffer2);
+            }
 
-            Console.WriteLine(Encoding.UTF8.GetString(buffer2));
+            //결과 받아오기
+            byte[] receiveBuffer = new byte[1024];
+            int receiveLength = serverSocket.Receive(receiveBuffer);
+            if (receiveLength < receiveBuffer.Length) 
+            { 
+                receiveLength = receiveBuffer.Length; 
+            }
+            if(receiveLength != 0)
+            {
+                Console.WriteLine("받기");
+
+            }
+
+            Console.WriteLine(Encoding.UTF8.GetString(receiveBuffer));
 
             serverSocket.Close();
 

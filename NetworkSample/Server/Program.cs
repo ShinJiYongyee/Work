@@ -30,8 +30,30 @@ namespace Server
                 //동기/blocking
                 Socket clientSocket = listenSocket.Accept();   //클라이언트 입장
 
-                byte[] buffer = new byte[1024];
-                int receiveLength = clientSocket.Receive(buffer);    //클라이언트 소켓으로 받기, 길이를 반환
+                //클라이언트에서 받기
+                byte[] receiveBuffer = new byte[1024];
+                int receiveLength = clientSocket.Receive(receiveBuffer);    //클라이언트 소켓으로 받기, 길이를 반환
+
+                //받은 합연산 메세지 분석 후 계산
+                string[] nums = Encoding.UTF8.GetString(receiveBuffer).Split('+');
+                int sum = 0;
+                for (int i = 0; i < nums.Length; i++)
+                {
+                    sum += int.Parse(nums[i]);
+                }
+
+                //결과 보내기
+                byte[] sendBuffer = new byte[1024];
+                sendBuffer = Encoding.UTF8.GetBytes(sum.ToString());
+                int sendLength = clientSocket.Send(sendBuffer);
+                if(sendLength < sendBuffer.Length)
+                {
+                    sendLength = clientSocket.Send(sendBuffer);
+                }
+
+                //서버에서 계산 결과 출력
+                Console.WriteLine(sum);
+
                 if (receiveLength <= 0) //받은 정보 x
                 {
                     //close
@@ -41,7 +63,6 @@ namespace Server
                     isRunning = false;
                 }
 
-                int sendLength = clientSocket.Send(buffer);
                 if (sendLength <= 0) //서버 끊김
                 {
                     //close
