@@ -1,11 +1,10 @@
 ﻿using Newtonsoft.Json.Linq;
-using System;
 using System.Collections.Generic;
-using System.IO;
-using System.Net;
 using System.Net.Sockets;
+using System.Net;
 using System.Text;
 using System.Threading;
+using System;
 
 namespace Server
 {
@@ -13,130 +12,93 @@ namespace Server
     {
         static Socket listenSocket;
 
-        static List<Socket> clientSockets = new List<Socket>();
-        //static List<Thread> threadManager = new List<Thread>();
-
-        static object _lock = new object();
-
-
-        static void AcceptThread()
+        static void SendMessage(Socket findSocket, List<Socket> clientSockets, string message)
         {
-            while (true)
+            byte[] messageBuffer = Encoding.UTF8.GetBytes(message);
+            ushort length = (ushort)IPAddress.HostToNetworkOrder((short)messageBuffer.Length);
+
+            byte[] headerBuffer = new byte[2];
+
+            headerBuffer = BitConverter.GetBytes(length);
+
+            byte[] packetBuffer = new byte[headerBuffer.Length + messageBuffer.Length];
+            Buffer.BlockCopy(headerBuffer, 0, packetBuffer, 0, headerBuffer.Length);
+            Buffer.BlockCopy(messageBuffer, 0, packetBuffer, headerBuffer.Length, messageBuffer.Length);
+            foreach (Socket sendSocket in clientSockets)
             {
-                Socket clientSocket = listenSocket.Accept();
-
-                lock (_lock)
-                {
-                    clientSockets.Add(clientSocket);
-                }
-                Console.WriteLine($"Connect client : {clientSocket.RemoteEndPoint}");
-
-                Thread workThread = new Thread(new ParameterizedThreadStart(WorkThread));
-                workThread.IsBackground = true;
-                workThread.Start(clientSocket);
-                //threadManager.Add(workThread);
+                int SendLength = sendSocket.Send(packetBuffer, packetBuffer.Length, SocketFlags.None);
             }
         }
 
-        static void WorkThread(Object clientObjectSocket)
+        static void ChatServe(List<Socket> clientSockets, List<Socket> checkRead)
         {
-
-            Socket clientSocket = clientObjectSocket as Socket;
-
             while (true)
             {
-                try
+                checkRead.Clear();
+                checkRead = new List<Socket>(clientSockets);
+                checkRead.Add(listenSocket);
+
+                Socket.Select(checkRead, null, null, -1);
+
+                foreach (Socket findSocket in checkRead)
                 {
-                    byte[] headerBuffer = new byte[2];
-                    int RecvLength = clientSocket.Receive(headerBuffer, 2, SocketFlags.None);
-                    if (RecvLength > 0)
+                    if (findSocket == listenSocket)
                     {
-                        short packetlength = BitConverter.ToInt16(headerBuffer, 0);
-                        packetlength = IPAddress.NetworkToHostOrder(packetlength);
-
-                        byte[] dataBuffer = new byte[4096];
-                        RecvLength = clientSocket.Receive(dataBuffer, packetlength, SocketFlags.None);
-                        string JsonString = Encoding.UTF8.GetString(dataBuffer);
-                        Console.WriteLine(JsonString);
-
-                        JObject clientData = JObject.Parse(JsonString);
-
-                        string message = "{ \"message\" : \"" + clientData.Value<String>("message") + "\"}";
-                        byte[] messageBuffer = Encoding.UTF8.GetBytes(message);
-                        ushort length = (ushort)IPAddress.HostToNetworkOrder((short)messageBuffer.Length);
-
-                        headerBuffer = BitConverter.GetBytes(length);
-
-                        byte[] packetBuffer = new byte[headerBuffer.Length + messageBuffer.Length];
-                        Buffer.BlockCopy(headerBuffer, 0, packetBuffer, 0, headerBuffer.Length);
-                        Buffer.BlockCopy(messageBuffer, 0, packetBuffer, headerBuffer.Length, messageBuffer.Length);
-                        lock (_lock)
-                        {
-                            foreach (Socket sendSocket in clientSockets)
-                            {
-                                int SendLength = sendSocket.Send(packetBuffer, packetBuffer.Length, SocketFlags.None);
-                            }
-                        }
+                        Socket clientSocket = listenSocket.Accept();
+                        clientSockets.Add(clientSocket);
+                        Console.WriteLine($"Connect client : {clientSocket.RemoteEndPoint}");
                     }
                     else
                     {
-                        string message = "{ \"message\" : \" Disconnect : " + clientSocket.RemoteEndPoint + " \"}";
-                        byte[] messageBuffer = Encoding.UTF8.GetBytes(message);
-                        ushort length = (ushort)IPAddress.HostToNetworkOrder((short)messageBuffer.Length);
-
-                        headerBuffer = BitConverter.GetBytes(length);
-
-                        byte[] packetBuffer = new byte[headerBuffer.Length + messageBuffer.Length];
-                        Buffer.BlockCopy(headerBuffer, 0, packetBuffer, 0, headerBuffer.Length);
-                        Buffer.BlockCopy(messageBuffer, 0, packetBuffer, headerBuffer.Length, messageBuffer.Length);
-
-                        clientSocket.Close();
-                        lock (_lock)
+                        try
                         {
-                            clientSockets.Remove(clientSocket);
-
-                            foreach (Socket sendSocket in clientSockets)
+                            byte[] headerBuffer = new byte[2];
+                            int RecvLength = findSocket.Receive(headerBuffer, 2, SocketFlags.None);
+                            if (RecvLength > 0)
                             {
-                                int SendLength = sendSocket.Send(packetBuffer, packetBuffer.Length, SocketFlags.None);
+                                short packetlength = BitConverter.ToInt16(headerBuffer, 0);
+                                packetlength = IPAddress.NetworkToHostOrder(packetlength);
+
+                                byte[] dataBuffer = new byte[4096];
+                                RecvLength = findSocket.Receive(dataBuffer, packetlength, SocketFlags.None);
+                                string JsonString = Encoding.UTF8.GetString(dataBuffer);
+                                Console.WriteLine(JsonString);
+
+                                JObject clientData = JObject.Parse(JsonString);
+
+                                string message = "{ \"message\" : \"" + clientData.Value<String>("message") + "\"}";
+                                SendMessage(findSocket, clientSockets, message);
+
+                            }
+                            else
+                            {
+                                string message = "{ \"message\" : \" Disconnect : " + findSocket.RemoteEndPoint + " \"}";
+                                SendMessage(findSocket, clientSockets, message);
+                                findSocket.Close();
+                                clientSockets.Remove(findSocket);
                             }
                         }
-
-                        return;
-                    }
-                }
-                catch (Exception e)
-                {
-                    Console.WriteLine($"Error 낸 놈 : {e.Message} {clientSocket.RemoteEndPoint}");
-
-                    string message = "{ \"message\" : \" Disconnect : " + clientSocket.RemoteEndPoint + " \"}";
-                    byte[] messageBuffer = Encoding.UTF8.GetBytes(message);
-                    ushort length = (ushort)IPAddress.HostToNetworkOrder((short)messageBuffer.Length);
-
-                    byte[] headerBuffer = new byte[2];
-
-                    headerBuffer = BitConverter.GetBytes(length);
-
-                    byte[] packetBuffer = new byte[headerBuffer.Length + messageBuffer.Length];
-                    Buffer.BlockCopy(headerBuffer, 0, packetBuffer, 0, headerBuffer.Length);
-                    Buffer.BlockCopy(messageBuffer, 0, packetBuffer, headerBuffer.Length, messageBuffer.Length);
-
-                    clientSocket.Close();
-                    lock (_lock)
-                    {
-                        clientSockets.Remove(clientSocket);
-
-                        foreach (Socket sendSocket in clientSockets)
+                        catch (Exception e)
                         {
-                            int SendLength = sendSocket.Send(packetBuffer, packetBuffer.Length, SocketFlags.None);
+                            Console.WriteLine($"Error 낸 놈 : {e.Message} {findSocket.RemoteEndPoint}");
+
+                            string message = "{ \"message\" : \" Disconnect : " + findSocket.RemoteEndPoint + " \"}";
+                            SendMessage(findSocket, clientSockets, message);
+                            findSocket.Close();
+                            clientSockets.Remove(findSocket);
                         }
+
                     }
 
-                    return;
                 }
+
+                //Server 작업
+                {
+                    Console.WriteLine("서버 작업");
+                }
+
             }
         }
-
-
         static void Main(string[] args)
         {
             listenSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
@@ -147,12 +109,12 @@ namespace Server
 
             listenSocket.Listen(10);
 
-            Thread acceptThread = new Thread(new ThreadStart(AcceptThread));
-            acceptThread.IsBackground = true;
-            acceptThread.Start();
+            List<Socket> clientSockets = new List<Socket>();
+            List<Socket> checkRead = new List<Socket>();
 
-            acceptThread.Join();
-
+            Thread thread = new Thread(() => ChatServe(clientSockets, checkRead));
+            thread.Start();
+            thread.Join();
 
             listenSocket.Close();
         }
