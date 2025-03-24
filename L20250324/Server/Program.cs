@@ -1,26 +1,37 @@
-﻿using Newtonsoft.Json;
-using Newtonsoft.Json.Linq;
+﻿using Newtonsoft.Json.Linq;
 using System;
 using System.Collections.Generic;
-using System.Linq;
 using System.Net;
 using System.Net.Sockets;
-using System.Net.WebSockets;
 using System.Text;
-using System.Threading.Tasks;
+using System.Web;
 
 namespace Server
 {
-    class Message
-    {
-        public string message;
-    }
-
     class Program
     {
+        static Socket listenSocket;
+
+        static void SendMessage(Socket findSocket, List<Socket> clientSockets, string message)
+        {
+            byte[] messageBuffer = Encoding.UTF8.GetBytes(message);
+            ushort length = (ushort)IPAddress.HostToNetworkOrder((short)messageBuffer.Length);
+
+            byte[] headerBuffer = new byte[2];
+
+            headerBuffer = BitConverter.GetBytes(length);
+
+            byte[] packetBuffer = new byte[headerBuffer.Length + messageBuffer.Length];
+            Buffer.BlockCopy(headerBuffer, 0, packetBuffer, 0, headerBuffer.Length);
+            Buffer.BlockCopy(messageBuffer, 0, packetBuffer, headerBuffer.Length, messageBuffer.Length);
+            foreach (Socket sendSocket in clientSockets)
+            {
+                int SendLength = sendSocket.Send(packetBuffer, packetBuffer.Length, SocketFlags.None);
+            }
+        }
         static void Main(string[] args)
         {
-            Socket listenSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+            listenSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
 
             IPEndPoint listenEndPoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), 4000);
 
@@ -69,32 +80,26 @@ namespace Server
                                 JObject clientData = JObject.Parse(JsonString);
 
                                 string message = "{ \"message\" : \"" + clientData.Value<String>("message") + "\"}";
-                                byte[] messageBuffer = Encoding.UTF8.GetBytes(message);
-                                ushort length = (ushort)IPAddress.HostToNetworkOrder((short)messageBuffer.Length);
+                                SendMessage(findSocket, clientSockets, message);
 
-                                headerBuffer = BitConverter.GetBytes(length);
-
-                                byte[] packetBuffer = new byte[headerBuffer.Length + messageBuffer.Length];
-                                Buffer.BlockCopy(headerBuffer, 0, packetBuffer, 0, headerBuffer.Length);
-                                Buffer.BlockCopy(messageBuffer, 0, packetBuffer, headerBuffer.Length, messageBuffer.Length);
-                                foreach (Socket sendSocket in clientSockets)
-                                {
-                                    int SendLength = sendSocket.Send(packetBuffer, packetBuffer.Length, SocketFlags.None);
-                                }
                             }
                             else
                             {
-                                findSocket.Close();
-                                clientSockets.Remove(findSocket);
+                                string message = "{ \"message\" : \" Disconnect : " + findSocket.RemoteEndPoint + " \"}";
+                                SendMessage(findSocket, clientSockets, message);
+
                             }
                         }
                         catch (Exception e)
                         {
                             Console.WriteLine($"Error 낸 놈 : {e.Message} {findSocket.RemoteEndPoint}");
 
-                            findSocket.Close();
-                            clientSockets.Remove(findSocket);
+                            string message = "{ \"message\" : \" Disconnect : " + findSocket.RemoteEndPoint + " \"}";
+                            SendMessage(findSocket, clientSockets, message);
+
+
                         }
+
                     }
 
                 }
