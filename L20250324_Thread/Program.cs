@@ -9,21 +9,35 @@ namespace L20250324_Thread
 {
     internal class Program
     {
-        static int Money = 0;
 
+        volatile static int Money = 0;
+
+        static SpinLock spinLock = new SpinLock();
+
+        static bool lockTaken = false;
+
+        static Object _lock = new Object(); //작업공간 열쇠
         static void Add()
         {
-            for (int i = 0; i < 100000000; i++)
+            lock (_lock)
             {
-                Money++;
+                for (int i = 0; i < 100000000; i++)
+                {
+                    Money++;
+                    //증감연산 도중 특정 작업공간 내부로 드나들 수 없음
+                    //원자성이 지켜진다
+                }
             }
         }
 
         static void Remove()
         {
-            for(int i = 0; i < 100000000; i++)
+            lock (_lock)
             {
-                Money--;
+                for (int i = 0; i < 100000000; i++)
+                {
+                    Money--;
+                }
             }
         }
 
@@ -46,8 +60,8 @@ namespace L20250324_Thread
             thread2.IsBackground = true;
 
             //thread 종료 시까지 대기
-            thread1.Join();
-            thread2.Join();
+            //thread1.Join();
+            //thread2.Join();
 
             Console.WriteLine($"Money : {Money}");
 
