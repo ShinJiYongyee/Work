@@ -14,32 +14,11 @@ namespace Client
 {
     class Program
     {
+        static Socket clientSocket;
 
-        //[][]
-        struct Packet
+        //메세지를 입력받고 보내는 함수
+        static void ChatSend()
         {
-            //[][]
-            string id; //20
-            //[][]
-            string message; //40
-        }
-
-        // 정수형 숫자
-        //short //htons
-        //int,  //htonl
-        //long  //htonll
-        //[1][2]
-
-        //[][]
-        static void Main(string[] args)
-        {
-
-            Socket clientSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
-
-            IPEndPoint listenEndPoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), 4000);
-
-            clientSocket.Connect(listenEndPoint);
-
             while (true)
             {
                 string InputChat;
@@ -49,9 +28,6 @@ namespace Client
                 string jsonString = "{\"id\" : \"태규\",  \"message\" : \"" + InputChat + ".\"}";
                 byte[] message = Encoding.UTF8.GetBytes(jsonString);
                 ushort length = (ushort)message.Length;
-
-                //길이  자료
-                //[][] [][][][][][][][]
                 byte[] lengthBuffer = new byte[2];
                 lengthBuffer = BitConverter.GetBytes(IPAddress.HostToNetworkOrder((short)length));
 
@@ -63,7 +39,18 @@ namespace Client
 
                 int SendLength = clientSocket.Send(buffer, buffer.Length, SocketFlags.None);
 
+            }
 
+
+        }
+
+        static void ChatRecv()
+        {
+            while (true)
+            {
+
+                byte[] lengthBuffer = new byte[2];
+                ushort length = BitConverter.ToUInt16(lengthBuffer, 0);
 
                 int RecvLength = clientSocket.Receive(lengthBuffer, 2, SocketFlags.None);
                 length = BitConverter.ToUInt16(lengthBuffer, 0);
@@ -75,7 +62,27 @@ namespace Client
 
                 Console.WriteLine(JsonString);
             }
+        }
+        //[][]
+        static void Main(string[] args)
+        {
 
+            clientSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
+
+            IPEndPoint listenEndPoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), 4000);
+
+            clientSocket.Connect(listenEndPoint);
+
+            Thread chatInputThread = new Thread(new ThreadStart(ChatSend));
+            chatInputThread.IsBackground = true;
+            chatInputThread.Start();
+
+            Thread chatRecvThread = new Thread(new ThreadStart(ChatRecv));
+            chatRecvThread.IsBackground = true;
+            chatRecvThread.Start();
+
+            chatInputThread.Join();
+            chatRecvThread.Join();
             clientSocket.Close();
         }
     }
