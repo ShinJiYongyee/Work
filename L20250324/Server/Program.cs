@@ -1,10 +1,15 @@
-﻿using Newtonsoft.Json.Linq;
+﻿using MySqlConnector;
+using Newtonsoft.Json.Linq;
+using System;
 using System.Collections.Generic;
-using System.Net.Sockets;
+using System.ComponentModel;
+using System.Data.SqlClient;
+using System.IO;
 using System.Net;
+using System.Net.Sockets;
 using System.Text;
 using System.Threading;
-using System;
+using System.Threading.Tasks;
 
 namespace Server
 {
@@ -12,93 +17,206 @@ namespace Server
     {
         static Socket listenSocket;
 
-        static void SendMessage(Socket findSocket, List<Socket> clientSockets, string message)
-        {
-            byte[] messageBuffer = Encoding.UTF8.GetBytes(message);
-            ushort length = (ushort)IPAddress.HostToNetworkOrder((short)messageBuffer.Length);
+        static List<Socket> clientSockets = new List<Socket>();
+        //static List<Thread> threadManager = new List<Thread>();
 
-            byte[] headerBuffer = new byte[2];
+        static object _lock = new object();
 
-            headerBuffer = BitConverter.GetBytes(length);
 
-            byte[] packetBuffer = new byte[headerBuffer.Length + messageBuffer.Length];
-            Buffer.BlockCopy(headerBuffer, 0, packetBuffer, 0, headerBuffer.Length);
-            Buffer.BlockCopy(messageBuffer, 0, packetBuffer, headerBuffer.Length, messageBuffer.Length);
-            foreach (Socket sendSocket in clientSockets)
-            {
-                int SendLength = sendSocket.Send(packetBuffer, packetBuffer.Length, SocketFlags.None);
-            }
-        }
-
-        static void ChatServe(List<Socket> clientSockets, List<Socket> checkRead)
+        static void AcceptThread()
         {
             while (true)
             {
-                checkRead.Clear();
-                checkRead = new List<Socket>(clientSockets);
-                checkRead.Add(listenSocket);
+                Socket clientSocket = listenSocket.Accept();
 
-                Socket.Select(checkRead, null, null, -1);
-
-                foreach (Socket findSocket in checkRead)
+                lock (_lock)
                 {
-                    if (findSocket == listenSocket)
+                    clientSockets.Add(clientSocket);
+                }
+                Console.WriteLine($"Connect client : {clientSocket.RemoteEndPoint}");
+
+                Thread workThread = new Thread(new ParameterizedThreadStart(WorkThread));
+
+                workThread.IsBackground = true;
+                workThread.Start(clientSocket);
+                //threadManager.Add(workThread);
+            }
+        }
+
+        static void WorkThread(Object clientObjectSocket)
+        {
+
+            Socket clientSocket = clientObjectSocket as Socket;
+
+            while (true)
+            {
+                try
+                {
+                    byte[] headerBuffer = new byte[2];
+                    int RecvLength = clientSocket.Receive(headerBuffer, 2, SocketFlags.None);
+                    if (RecvLength > 0)
                     {
-                        Socket clientSocket = listenSocket.Accept();
-                        clientSockets.Add(clientSocket);
-                        Console.WriteLine($"Connect client : {clientSocket.RemoteEndPoint}");
-                    }
-                    else
-                    {
+                        short packetlength = BitConverter.ToInt16(headerBuffer, 0);
+                        packetlength = IPAddress.NetworkToHostOrder(packetlength);
+
+                        byte[] dataBuffer = new byte[4096];
+                        RecvLength = clientSocket.Receive(dataBuffer, packetlength, SocketFlags.None);
+                        string JsonString = Encoding.UTF8.GetString(dataBuffer);
+                        Console.WriteLine(JsonString);
+
+                        string connectionString = "server=localhost;user=root;database=membership;password=12345678";
+                        MySqlConnection mySqlConnection = new MySqlConnection(connectionString);
+
+                        JObject clientData = JObject.Parse(JsonString);
+                        string code = clientData.Value<String>("code");
+
                         try
                         {
-                            byte[] headerBuffer = new byte[2];
-                            int RecvLength = findSocket.Receive(headerBuffer, 2, SocketFlags.None);
-                            if (RecvLength > 0)
+                            if (code.CompareTo("Login") == 0)
                             {
-                                short packetlength = BitConverter.ToInt16(headerBuffer, 0);
-                                packetlength = IPAddress.NetworkToHostOrder(packetlength);
+                                string userId = clientData.Value<String>("id");
+                                string userPassword = clientData.Value<String>("password");
 
-                                byte[] dataBuffer = new byte[4096];
-                                RecvLength = findSocket.Receive(dataBuffer, packetlength, SocketFlags.None);
-                                string JsonString = Encoding.UTF8.GetString(dataBuffer);
-                                Console.WriteLine(JsonString);
+                                mySqlConnection.Open();
+                                MySqlCommand mySqlCommand = new MySqlCommand();
+                                mySqlCommand.Connection = mySqlConnection;
 
-                                JObject clientData = JObject.Parse(JsonString);
+                                mySqlCommand.CommandText = "select * from users where user_id = @user_id and user_password = @user_password";
+                                mySqlCommand.Prepare();
+                                mySqlCommand.Parameters.AddWithValue("@user_id", userId);
+                                mySqlCommand.Parameters.AddWithValue("@user_password", userPassword);
 
-                                string message = "{ \"message\" : \"" + clientData.Value<String>("message") + "\"}";
-                                SendMessage(findSocket, clientSockets, message);
+                                MySqlDataReader dataReader = mySqlCommand.ExecuteReader();
+                                if (dataReader.Read())
+                                {
+                                    //로그인 성공
+                                    JObject result = new JObject();
+                                    result.Add("code", "loginresult");
+                                    result.Add("messge", "success");
+                                    result.Add("name", dataReader["name"].ToString());
+                                    result.Add("email", dataReader["email"].ToString());
+                                    SendPacket(clientSocket, result.ToString());
+                                }
+                                else
+                                {
+                                    //로그인 실패
+                                    JObject result = new JObject();
+                                    result.Add("code", "loginresult");
+                                    result.Add("messge", "failed");
+                                    SendPacket(clientSocket, result.ToString());
+                                }
+
 
                             }
-                            else
+                            else if (code.CompareTo("Signup") == 0)
                             {
-                                string message = "{ \"message\" : \" Disconnect : " + findSocket.RemoteEndPoint + " \"}";
-                                SendMessage(findSocket, clientSockets, message);
-                                findSocket.Close();
-                                clientSockets.Remove(findSocket);
+                                string userId = clientData.Value<String>("id");
+                                string userPassword = clientData.Value<String>("password");
+                                string name = clientData.Value<String>("name");
+                                string email = clientData.Value<String>("email");
+
+                                mySqlConnection.Open();
+                                MySqlCommand mySqlCommand2 = new MySqlCommand();
+                                mySqlCommand2.Connection = mySqlConnection;
+
+                                mySqlCommand2.CommandText = "insert into users (user_id, user_password, name, email) values ( @user_id, @user_password, @name, @email)";
+                                mySqlCommand2.Prepare();
+                                mySqlCommand2.Parameters.AddWithValue("@user_id", userId);
+                                mySqlCommand2.Parameters.AddWithValue("@user_password", userPassword);
+                                mySqlCommand2.Parameters.AddWithValue("@name", name);
+                                mySqlCommand2.Parameters.AddWithValue("@email", email);
+                                mySqlCommand2.ExecuteNonQuery();
+
+                                //가입 성공했습니다.
+                                JObject result = new JObject();
+                                result.Add("code", "signupresult");
+                                result.Add("messge", "success");
+                                SendPacket(clientSocket, result.ToString());
                             }
                         }
                         catch (Exception e)
                         {
-                            Console.WriteLine($"Error 낸 놈 : {e.Message} {findSocket.RemoteEndPoint}");
+                            Console.WriteLine(e.Message);
+                        }
+                        finally
+                        {
+                            mySqlConnection.Close();
+                        }
+                    }
+                    else
+                    {
+                        string message = "{ \"message\" : \" Disconnect : " + clientSocket.RemoteEndPoint + " \"}";
+                        byte[] messageBuffer = Encoding.UTF8.GetBytes(message);
+                        ushort length = (ushort)IPAddress.HostToNetworkOrder((short)messageBuffer.Length);
 
-                            string message = "{ \"message\" : \" Disconnect : " + findSocket.RemoteEndPoint + " \"}";
-                            SendMessage(findSocket, clientSockets, message);
-                            findSocket.Close();
-                            clientSockets.Remove(findSocket);
+                        headerBuffer = BitConverter.GetBytes(length);
+
+                        byte[] packetBuffer = new byte[headerBuffer.Length + messageBuffer.Length];
+                        Buffer.BlockCopy(headerBuffer, 0, packetBuffer, 0, headerBuffer.Length);
+                        Buffer.BlockCopy(messageBuffer, 0, packetBuffer, headerBuffer.Length, messageBuffer.Length);
+
+                        clientSocket.Close();
+                        lock (_lock)
+                        {
+                            clientSockets.Remove(clientSocket);
+
+                            foreach (Socket sendSocket in clientSockets)
+                            {
+                                int SendLength = sendSocket.Send(packetBuffer, packetBuffer.Length, SocketFlags.None);
+                            }
                         }
 
+                        return;
+                    }
+                }
+                catch (Exception e)
+                {
+                    Console.WriteLine($"Error 낸 놈 : {e.Message} {clientSocket.RemoteEndPoint}");
+
+                    string message = "{ \"message\" : \" Disconnect : " + clientSocket.RemoteEndPoint + " \"}";
+                    byte[] messageBuffer = Encoding.UTF8.GetBytes(message);
+                    ushort length = (ushort)IPAddress.HostToNetworkOrder((short)messageBuffer.Length);
+
+                    byte[] headerBuffer = new byte[2];
+
+                    headerBuffer = BitConverter.GetBytes(length);
+
+                    byte[] packetBuffer = new byte[headerBuffer.Length + messageBuffer.Length];
+                    Buffer.BlockCopy(headerBuffer, 0, packetBuffer, 0, headerBuffer.Length);
+                    Buffer.BlockCopy(messageBuffer, 0, packetBuffer, headerBuffer.Length, messageBuffer.Length);
+
+                    clientSocket.Close();
+                    lock (_lock)
+                    {
+                        clientSockets.Remove(clientSocket);
+
+                        foreach (Socket sendSocket in clientSockets)
+                        {
+                            int SendLength = sendSocket.Send(packetBuffer, packetBuffer.Length, SocketFlags.None);
+                        }
                     }
 
+                    return;
                 }
-
-                //Server 작업
-                {
-                    Console.WriteLine("서버 작업");
-                }
-
             }
         }
+
+        static void SendPacket(Socket toSocket, string message)
+        {
+            byte[] messageBuffer = Encoding.UTF8.GetBytes(message);
+            ushort length = (ushort)IPAddress.HostToNetworkOrder((short)messageBuffer.Length);
+
+            byte[] headerBuffer = BitConverter.GetBytes(length);
+
+            byte[] packetBuffer = new byte[headerBuffer.Length + messageBuffer.Length];
+            Buffer.BlockCopy(headerBuffer, 0, packetBuffer, 0, headerBuffer.Length);
+            Buffer.BlockCopy(messageBuffer, 0, packetBuffer, headerBuffer.Length, messageBuffer.Length);
+
+            int SendLength = toSocket.Send(packetBuffer, packetBuffer.Length, SocketFlags.None);
+
+        }
+
+
         static void Main(string[] args)
         {
             listenSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
@@ -109,14 +227,14 @@ namespace Server
 
             listenSocket.Listen(10);
 
-            List<Socket> clientSockets = new List<Socket>();
-            List<Socket> checkRead = new List<Socket>();
+            Task acceptTask = new Task(AcceptThread);
 
-            Thread thread = new Thread(() => ChatServe(clientSockets, checkRead));
-            thread.Start();
-            thread.Join();
+            acceptTask.Start();
+
+            acceptTask.Wait();
 
             listenSocket.Close();
+
         }
     }
 }

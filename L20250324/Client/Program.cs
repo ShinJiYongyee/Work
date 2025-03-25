@@ -1,8 +1,15 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Linq;
 using System.Net.Sockets;
 using System.Net;
 using System.Text;
+using System.Threading.Tasks;
+using System.Xml.Linq;
 using System.Threading;
+using System.Data;
+using System.Diagnostics;
+using Newtonsoft.Json.Linq;
 
 namespace Client
 {
@@ -10,73 +17,56 @@ namespace Client
     {
         static Socket clientSocket;
 
-        //메세지를 입력받고 보내는 함수
-        static void ChatSend()
+        static void SendPacket(Socket toSocket, string message)
         {
-            while (true)
-            {
-                string InputChat;
-                Console.Write("채팅 : ");
-                InputChat = Console.ReadLine();
+            byte[] messageBuffer = Encoding.UTF8.GetBytes(message);
+            ushort length = (ushort)IPAddress.HostToNetworkOrder((short)messageBuffer.Length);
 
-                string jsonString = "{\"id\" : \"태규\",  \"message\" : \"" + InputChat + ".\"}";
-                byte[] message = Encoding.UTF8.GetBytes(jsonString);
-                ushort length = (ushort)message.Length;
-                byte[] lengthBuffer = new byte[2];
-                lengthBuffer = BitConverter.GetBytes(IPAddress.HostToNetworkOrder((short)length));
+            byte[] headerBuffer = BitConverter.GetBytes(length);
 
-                //[][][][][][][][][][][]
-                byte[] buffer = new byte[2 + length];
+            byte[] packetBuffer = new byte[headerBuffer.Length + messageBuffer.Length];
+            Buffer.BlockCopy(headerBuffer, 0, packetBuffer, 0, headerBuffer.Length);
+            Buffer.BlockCopy(messageBuffer, 0, packetBuffer, headerBuffer.Length, messageBuffer.Length);
 
-                Buffer.BlockCopy(lengthBuffer, 0, buffer, 0, 2);
-                Buffer.BlockCopy(message, 0, buffer, 2, length);
-
-                int SendLength = clientSocket.Send(buffer, buffer.Length, SocketFlags.None);
-
-            }
-
+            int SendLength = toSocket.Send(packetBuffer, packetBuffer.Length, SocketFlags.None);
 
         }
 
-        static void ChatRecv()
-        {
-            while (true)
-            {
-
-                byte[] lengthBuffer = new byte[2];
-                ushort length = BitConverter.ToUInt16(lengthBuffer, 0);
-
-                int RecvLength = clientSocket.Receive(lengthBuffer, 2, SocketFlags.None);
-                length = BitConverter.ToUInt16(lengthBuffer, 0);
-                length = (ushort)IPAddress.NetworkToHostOrder((short)length);
-                byte[] recvBuffer = new byte[4096];
-                RecvLength = clientSocket.Receive(recvBuffer, length, SocketFlags.None);
-
-                string JsonString = Encoding.UTF8.GetString(recvBuffer);
-
-                Console.WriteLine(JsonString);
-            }
-        }
-        //[][]
         static void Main(string[] args)
         {
-
             clientSocket = new Socket(AddressFamily.InterNetwork, SocketType.Stream, ProtocolType.Tcp);
 
             IPEndPoint listenEndPoint = new IPEndPoint(IPAddress.Parse("127.0.0.1"), 4000);
 
             clientSocket.Connect(listenEndPoint);
 
-            Thread chatInputThread = new Thread(new ThreadStart(ChatSend));
-            chatInputThread.IsBackground = true;
-            chatInputThread.Start();
+            JObject result = new JObject();
+            //result.Add("code", "Login");
+            //result.Add("id", "htk008");
+            //result.Add("password", "1235");
+            //SendPacket(clientSocket, result.ToString());
 
-            Thread chatRecvThread = new Thread(new ThreadStart(ChatRecv));
-            chatRecvThread.IsBackground = true;
-            chatRecvThread.Start();
+            result.Add("code", "Signup");
+            result.Add("id", "robot");
+            result.Add("password", "1234");
+            result.Add("name", "로봇");
+            result.Add("email", "robot@a.com");
+            SendPacket(clientSocket, result.ToString());
 
-            chatInputThread.Join();
-            chatRecvThread.Join();
+
+            byte[] lengthBuffer = new byte[2];
+
+            int RecvLength = clientSocket.Receive(lengthBuffer, 2, SocketFlags.None);
+            ushort length = BitConverter.ToUInt16(lengthBuffer, 0);
+            length = (ushort)IPAddress.NetworkToHostOrder((short)length);
+            byte[] recvBuffer = new byte[4096];
+            RecvLength = clientSocket.Receive(recvBuffer, length, SocketFlags.None);
+
+            string JsonString = Encoding.UTF8.GetString(recvBuffer);
+
+            Console.WriteLine(JsonString);
+
+
             clientSocket.Close();
         }
     }
