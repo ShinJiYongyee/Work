@@ -2,26 +2,40 @@
 {
     internal class Program
     {
-        static void Lee(int repeatCount) //재귀함수, num에서 시작
+        static void foo(int repeatCount, int maxNum)
         {
-
-            if (repeatCount <= 0) //기저 조건
+            if (repeatCount > maxNum)
             {
                 return;
             }
+            foo(repeatCount + 1, maxNum);
+            bar(repeatCount, maxNum);
+            Console.WriteLine();
+        }
+        static void bar(int repeatCount, int maxNum)
+        {
+            if (repeatCount > maxNum)
+            {
+                return;
+            }
+            bar(repeatCount + 1, maxNum);
             Console.Write('*');
-            Lee(repeatCount - 1); //재귀 조건
         }
 
         static void Main(string[] args)
         {
-
-            //for (int i = 1; i <= 10; i++)
+            //for (int i = 1; i <= 5; i++)
             //{
-            //    Console.Write('*');
+            //    for (int j = 0; j < i; j++)
+            //    {
+            //        Console.Write('*');
+            //    }
+            //    Console.WriteLine();
             //}
 
-            Lee(5);
+            //삼각형 그리기를 수행하는 두 개의 재귀함수
+            foo(1, 5);
+
         }
     }
 }
