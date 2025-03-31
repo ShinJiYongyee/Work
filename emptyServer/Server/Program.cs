@@ -25,37 +25,61 @@ namespace Server
 
             listenSocket.Listen(10);
 
-            Socket clientSocket = listenSocket.Accept();
+            List<Socket> clientSockets = new List<Socket>();
+            List<Socket> checkRead = new List<Socket>();
 
-            byte[] headerBuffer = new byte[2];
+            while (true)
+            {
+                checkRead.Clear();
+                checkRead = new List<Socket>(clientSockets);
+                checkRead.Add(listenSocket);
 
-            int RecvLength = clientSocket.Receive(headerBuffer, 2, SocketFlags.None);
-     
-            short packetlength = BitConverter.ToInt16(headerBuffer, 0);
-            packetlength =IPAddress.NetworkToHostOrder(packetlength);
+                //[listen]
+                Socket.Select(checkRead, null, null, -1);
 
-            byte[] dataBuffer = new byte[4096];
-            RecvLength = clientSocket.Receive(dataBuffer, packetlength, SocketFlags.None);
+                foreach (Socket findsocket in checkRead)
+                {
+                    if(findsocket == listenSocket)
+                    {
+                        Socket clientSocket = listenSocket.Accept();
+                        clientSockets.Add(clientSocket);
+                        Console.WriteLine($"Connect client : {clientSocket.RemoteEndPoint}");
+                    }
+                    else
+                    {
+                        byte[] headBuffer = new byte[2];
+                        int RecvLength = findsocket.Receive(headBuffer, 2, SocketFlags.None);
+                        if (RecvLength > 0)
+                        {
+                            short packetLength = BitConverter.ToInt16(headBuffer, 0);
+                            packetLength = IPAddress.NetworkToHostOrder(packetLength);
 
-            string JsonString = Encoding.UTF8.GetString(dataBuffer, 0, RecvLength);
+                            byte[] dataBuffer = new byte[4096];
+                            RecvLength = findsocket.Receive(dataBuffer, packetLength, SocketFlags.None);
+                            string JsonString = Encoding.UTF8.GetString(dataBuffer);
+                            Console.WriteLine(JsonString);
 
-            Console.WriteLine(JsonString);
+                            string message = "{ \"message\" : \"클라이언트 받고 서버꺼 추가.\"}";
+                            byte[] messageBuffer = Encoding.UTF8.GetBytes(message);
+                            ushort length =(ushort) IPAddress.HostToNetworkOrder(messageBuffer.Length);
 
-            string message = "{\"message\" : \"클라이언트 받고 서버 데이터 추가\"}";
-            byte[] messageBuffer = Encoding.UTF8.GetBytes(message);
-            ushort length =(ushort) IPAddress.HostToNetworkOrder(messageBuffer.Length);
+                            headBuffer = BitConverter.GetBytes(length);
 
-            headerBuffer = BitConverter.GetBytes(length);
+                            byte[] packetBuffer = new byte[headBuffer.Length + messageBuffer.Length];
+                            Buffer.BlockCopy(headBuffer, 0, packetBuffer, 0, headBuffer.Length);
+                            Buffer.BlockCopy(messageBuffer, 0, packetBuffer, headBuffer.Length, messageBuffer.Length);
+                            int SendLength = findsocket.Send(packetBuffer, packetBuffer.Length, SocketFlags.None);
+                        }
+                        else
+                        {
+                            findsocket.Close();
+                            clientSockets.Remove(findsocket);
+                        }
+                    }
+                }
+            }
 
-            byte[] packetBuffer = new byte[headerBuffer.Length + messageBuffer.Length];
 
-            Buffer.BlockCopy(headerBuffer, 0, packetBuffer, 0, headerBuffer.Length);
-            Buffer.BlockCopy(messageBuffer, 0, packetBuffer, headerBuffer.Length, messageBuffer.Length);
-
-            int sendLength = clientSocket.Send(packetBuffer, packetBuffer.Length, SocketFlags.None);
-
-            clientSocket.Close();
-            listenSocket.Close();
         }
     }
 }
