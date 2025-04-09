@@ -3,27 +3,53 @@
 
     public class Program
     {
+        private const int bufferSize = 131072;
+        public static readonly StreamReader input = new(new
+            BufferedStream(Console.OpenStandardInput(), bufferSize));
+        public static readonly StreamWriter output = new(new
+            BufferedStream(Console.OpenStandardOutput(), bufferSize));
+
+        static int N;
+        static int K = 0;
+        static string[] s = new string[21];
+
+        static string Hanoi(int N, int from, int to, int by)
+        {
+
+            if (s[N] != null)
+            {
+                return s[N];
+            }
+            if (N == 1)
+            {
+                K++;
+                return s[N] = $"{from} {to}\n";
+            }
+            else
+            {
+
+                string left = Hanoi(N - 1, from, by, to);
+                K++;
+                string mid = $"{from} {to}\n";
+                string right = Hanoi(N - 1, by, to, from);
+
+                return s[N] = left+mid+right;
+            }
+
+        }
+
         static void Main(string[] args)
         {
-            List<int> list = new List<int>();
-            int index = 0;
-
-            for (int i = 2; i <= 9; i++)
+            N = int.Parse(input.ReadLine());
+            Hanoi(N, 1, 3, 2); //(N from to by)
+            output.WriteLine(K);
+            foreach (string s in s)
             {
-                for(int j = 1; j <= 9; j++)
-                {
-                    list.Add(i*j);
-                }
+                output.WriteLine(s);
             }
-
-            for (int i = 2; i <= 9; i++)
-            {
-                for (int j = 1; j <= 9; j++)
-                {
-                    Console.WriteLine($"{i}x{j}=" + list[index]);
-                    index++;
-                }
-            }
+            output.Flush();
         }
     }
+
+
 }
